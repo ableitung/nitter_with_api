@@ -96,6 +96,37 @@ type
     suspended*: bool
     joinDate*: DateTime
 
+  AccountInfo* = object
+    username*: string
+    fullname*: string
+    userPic*: string
+    joinDate*: DateTime
+    verifiedType*: VerifiedType
+    suspended*: bool
+    basedIn*: string
+    source*: string
+    usernameChanges*: int
+    lastUsernameChange*: DateTime
+    affiliateUsername*: string
+    affiliateLabel*: string
+    isIdentityVerified*: bool
+    verifiedSince*: DateTime
+    overrideVerifiedYear*: int
+
+  Broadcast* = object
+    id*: string
+    title*: string
+    state*: string
+    thumb*: string
+    mediaKey*: string
+    m3u8Url*: string
+    totalWatched*: int
+    startTime*: DateTime
+    endTime*: DateTime
+    replayStart*: int
+    availableForReplay*: bool
+    user*: User
+
   VideoType* = enum
     m3u8 = "application/x-mpegURL"
     mp4 = "video/mp4"
@@ -273,6 +304,7 @@ type
     photoRail*: PhotoRail
     pinned*: Option[Tweet]
     tweets*: Timeline
+    accountInfo*: AccountInfo
 
   List* = object
     id*: string

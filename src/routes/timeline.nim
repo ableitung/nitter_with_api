@@ -4,13 +4,13 @@ import jester, karax/vdom
 
 import router_utils
 import ".."/[types, redis_cache, formatters, query, api]
-import ../views/[general, profile, timeline, status, search]
+import ../views/[general, profile, timeline, status, search, about_account]
 
 export vdom
 export uri, sequtils
 export router_utils
 export redis_cache, formatters, query, api
-export profile, timeline, status
+export profile, timeline, status, about_account
 
 proc formatApiTime(dt: DateTime): string =
   dt.format("yyyy-MM-dd'T'HH:mm:ss'Z'")
@@ -122,6 +122,8 @@ proc tweetToJson*(tweet: Tweet; cfg: Config; prefs: Prefs; depth=1): JsonNode =
     "tombstone": tweet.tombstone,
     "location": tweet.location,
     "reply_to": tweet.reply,
+    "reply_id": (if tweet.replyId != 0: %($tweet.replyId) else: newJNull()),
+    "thread_id": (if tweet.threadId != 0: %($tweet.threadId) else: newJNull()),
     "pinned": tweet.pinned,
     "has_thread": tweet.hasThread,
     "note": tweet.note,
@@ -152,7 +154,7 @@ proc tweetToJson*(tweet: Tweet; cfg: Config; prefs: Prefs; depth=1): JsonNode =
 
   result
 
-proc tweetsToJson(tweets: Tweets; cfg: Config; prefs: Prefs): JsonNode =
+proc tweetsToJson*(tweets: Tweets; cfg: Config; prefs: Prefs): JsonNode =
   result = newJArray()
   for tweet in tweets:
     result.add tweetToJson(tweet, cfg, prefs)
@@ -236,6 +238,7 @@ proc fetchProfile*(after: string; query: Query; skipRail=false): Future[Profile]
         getCachedPhotoRail(userId)
 
     user = getCachedUser(name)
+    info = getCachedAccountInfo(name, fetch=false)
 
   result =
     case query.kind
@@ -246,6 +249,7 @@ proc fetchProfile*(after: string; query: Query; skipRail=false): Future[Profile]
 
   result.user = await user
   result.photoRail = await rail
+  result.accountInfo = await info
 
   result.tweets.query = query
 
@@ -317,6 +321,20 @@ proc createTimelineRouter*(cfg: Config) =
 
       resp Http200, timelineApiResponse(profile, cfg, prefs),
            "application/json; charset=utf-8"
+
+    get "/@name/about/?":
+      cond @"name".allCharsInSet({'a'..'z', 'A'..'Z', '0'..'9', '_'})
+      let
+        prefs = requestPrefs()
+        name = @"name"
+        info = await getCachedAccountInfo(name)
+      if info.suspended:
+        resp showError(getSuspended(name), cfg)
+      if info.username.len == 0:
+        resp Http404, showError("User \"" & name & "\" not found", cfg)
+      let aboutHtml = renderAboutAccount(info)
+      resp renderMain(aboutHtml, request, cfg, prefs,
+                      "About @" & info.username)
 
     get "/@name/?@tab?/?":
       cond '.' notin @"name"

@@ -68,6 +68,64 @@ proc parseGraphUser(js: JsonNode): User =
     with verifiedType, user{"verification", "verified_type"}:
       result.verifiedType = parseEnum[VerifiedType](verifiedType.getStr)
 
+proc parseAboutAccount*(js: JsonNode): AccountInfo =
+  if js.isNull: return
+
+  let user = ? js{"data", "user_result_by_screen_name", "result"}
+
+  if user{"unavailable_reason"}.getStr == "Suspended":
+    result.suspended = true
+    return
+
+  result = AccountInfo(
+    username: user{"core", "screen_name"}.getStr,
+    fullname: user{"core", "name"}.getStr,
+    joinDate: user{"core", "created_at"}.getTime,
+    userPic: user{"avatar", "image_url"}.getImageStr.replace("_normal", ""),
+    affiliateLabel: user{"identity_profile_labels_highlighted_label", "label", "description"}.getStr,
+  )
+
+  if user{"is_blue_verified"}.getBool(false):
+    result.verifiedType = blue
+  with verifiedType, user{"verification", "verified_type"}:
+    result.verifiedType = parseEnum[VerifiedType](verifiedType.getStr)
+
+  with about, user{"about_profile"}:
+    result.basedIn = about{"account_based_in"}.getStr
+    result.source = about{"source"}.getStr
+    result.affiliateUsername = about{"affiliate_username"}.getStr
+
+    try: 
+      result.usernameChanges = about{"username_changes", "count"}.getStr("0").parseInt
+    except ValueError: 
+      discard
+
+    with lastChange, about{"username_changes", "last_changed_at_msec"}:
+      result.lastUsernameChange = lastChange.getTimeFromMsStr
+
+  with info, user{"verification_info"}:
+    result.isIdentityVerified = info{"is_identity_verified"}.getBool
+    with reason, info{"reason"}:
+      result.overrideVerifiedYear = reason{"override_verified_year"}.getInt
+      with since, reason{"verified_since_msec"}:
+        result.verifiedSince = since.getTimeFromMsStr
+
+proc parseBroadcastInfo*(js: JsonNode): Broadcast =
+  let bc = ? js{"data", "broadcast"}
+  result = Broadcast(
+    id: bc{"broadcast_id"}.getStr,
+    title: bc{"status"}.getStr,
+    state: bc{"state"}.getStr.toUpperAscii,
+    thumb: bc{"image_url"}.getStr,
+    mediaKey: bc{"media_key"}.getStr,
+    totalWatched: bc{"total_watched"}.getInt,
+    startTime: bc{"start_time"}.getTimeFromMs,
+    endTime: bc{"end_time"}.getTimeFromMs,
+    replayStart: bc{"edited_replay", "start_time"}.getInt,
+    availableForReplay: bc{"available_for_replay"}.getBool,
+    user: parseGraphUser(bc)
+  )
+
 proc parseGraphList*(js: JsonNode): List =
   if js.isNull: return
 
@@ -245,14 +303,23 @@ proc parsePromoVideo(js: JsonNode): Video =
   result.variants.add variant
 
 proc parseBroadcast(js: JsonNode): Card =
-  let image = js{"broadcast_thumbnail_large"}.getImageVal
+  let
+    image = js{"broadcast_thumbnail_large"}.getImageVal
+    broadcastUrl = js{"broadcast_url"}.getStrVal
+    broadcastId = broadcastUrl.rsplit('/', maxsplit=1)[^1]
+    streamUrl = "/i/broadcasts/" & broadcastId & "/stream"
   result = Card(
     kind: broadcast,
-    url: js{"broadcast_url"}.getStrVal,
+    url: "/i/broadcasts/" & broadcastId,
     title: js{"broadcaster_display_name"}.getStrVal,
     text: js{"broadcast_title"}.getStrVal,
     image: image,
-    video: some Video(thumb: image)
+    video: some Video(
+      thumb: image,
+      available: true,
+      playbackType: m3u8,
+      variants: @[VideoVariant(contentType: m3u8, url: streamUrl)]
+    )
   )
 
 proc parseCard(js: JsonNode; urls: JsonNode): Card =

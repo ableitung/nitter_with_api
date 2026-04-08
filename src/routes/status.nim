@@ -5,7 +5,7 @@ import jester, karax/vdom
 
 import router_utils
 import ".."/[types, formatters, api]
-from timeline import tweetApiResponse, apiErrorResponse
+from timeline import tweetToJson, tweetsToJson, tweetApiResponse, apiErrorResponse
 import ../views/[general, status]
 
 export uri, sequtils, options, sugar
@@ -87,8 +87,9 @@ proc createStatusRouter*(cfg: Config) =
           error = conv.tweet.tombstone
         resp Http404, apiErrorResponse(error), "application/json; charset=utf-8"
 
-      let body = tweetApiResponse(conv.tweet, cfg, prefs)
-      resp Http200, body, "application/json; charset=utf-8"
+      var body = tweetToJson(conv.tweet, cfg, prefs)
+      body["before"] = tweetsToJson(conv.before.content, cfg, prefs)
+      resp Http200, $body, "application/json; charset=utf-8"
 
     get "/@name/status/@id/history/?":
       cond '.' notin @"name"

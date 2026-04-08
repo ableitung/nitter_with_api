@@ -25,6 +25,10 @@ const
   graphListBySlug* = "K6wihoTiTrzNzSF8y1aeKQ/ListBySlug"
   graphListMembers* = "fuVHh5-gFn8zDBBxb8wOMA/ListMembers"
   graphListTweets* = "VQf8_XQynI3WzH6xopOMMQ/ListTimeline"
+  graphAboutAccount* = "zs_jFPFT78rBpXv9Z3U2YQ/AboutAccountQuery"
+
+  graphBroadcast* = "0nMmbMh-_JwwRRFNXkyH3Q/BroadcastQuery"
+  restLiveStream* = "1.1/live_video_stream/status/"
 
   gqlFeatures* = """{
   "android_ad_formats_media_component_render_overlay_enabled": false,
