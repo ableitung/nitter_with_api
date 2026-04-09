@@ -336,6 +336,26 @@ proc createTimelineRouter*(cfg: Config) =
       resp renderMain(aboutHtml, request, cfg, prefs,
                       "About @" & info.username)
 
+    get "/@name/api":
+      cond '.' notin @"name"
+      cond @"name" notin ["pic", "gif", "video", "search", "settings", "login", "intent", "i"]
+      cond @"name".allCharsInSet({'a'..'z', 'A'..'Z', '0'..'9', '_', ','})
+
+      let
+        prefs = requestPrefs()
+        after = getCursor()
+        name = @"name"
+        profile = await fetchProfile(after, Query(fromUser: @[name]), skipRail=true)
+
+      if profile.user.suspended:
+        resp Http404, apiErrorResponse(getSuspended(name)), "application/json; charset=utf-8"
+
+      if profile.user.id.len == 0:
+        resp Http404, apiErrorResponse("User not found"), "application/json; charset=utf-8"
+
+      resp Http200, timelineApiResponse(profile, cfg, prefs),
+           "application/json; charset=utf-8"
+
     get "/@name/?@tab?/?":
       cond '.' notin @"name"
       cond @"name" notin ["pic", "gif", "video", "search", "settings", "login", "intent", "i"]
